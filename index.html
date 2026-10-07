@@ -1,0 +1,1254 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Cờ Caro 15x15 - ZingPlay Style</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- PeerJS for Realtime P2P Socket Multiplayer -->
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;600;700;800&display=swap');
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            user-select: none;
+            touch-action: manipulation;
+        }
+
+        /* Bàn cờ & Giao diện Theme */
+        .theme-wood {
+            background: radial-gradient(circle, #2c1b0e 0%, #150a04 100%);
+            --board-bg: #e4a961;
+            --board-border: #8b5a2b;
+            --grid-line: #6d421e;
+            --cell-hover: rgba(139, 90, 43, 0.3);
+            --card-bg: rgba(44, 27, 14, 0.85);
+            --card-border: rgba(228, 169, 97, 0.3);
+            --text-color: #f7e7ce;
+            --accent-color: #f39c12;
+        }
+
+        .theme-cyberpunk {
+            background: radial-gradient(circle, #0d0221 0%, #050014 100%);
+            --board-bg: #190a38;
+            --board-border: #00f0ff;
+            --grid-line: #7000ff;
+            --cell-hover: rgba(0, 240, 255, 0.2);
+            --card-bg: rgba(25, 10, 56, 0.85);
+            --card-border: rgba(0, 240, 255, 0.4);
+            --text-color: #00f0ff;
+            --accent-color: #ff007f;
+        }
+
+        .theme-sakura {
+            background: radial-gradient(circle, #2b111e 0%, #17050e 100%);
+            --board-bg: #ffd1dc;
+            --board-border: #ff69b4;
+            --grid-line: #d87093;
+            --cell-hover: rgba(255, 105, 180, 0.3);
+            --card-bg: rgba(43, 17, 30, 0.85);
+            --card-border: rgba(255, 105, 180, 0.4);
+            --text-color: #ffb6c1;
+            --accent-color: #ff1493;
+        }
+
+        .theme-dark {
+            background: radial-gradient(circle, #1a1a1a 0%, #0d0d0d 100%);
+            --board-bg: #2d2d2d;
+            --board-border: #4a4a4a;
+            --grid-line: #3d3d3d;
+            --cell-hover: rgba(255, 255, 255, 0.1);
+            --card-bg: rgba(30, 30, 30, 0.85);
+            --card-border: rgba(255, 255, 255, 0.15);
+            --text-color: #e0e0e0;
+            --accent-color: #3b82f6;
+        }
+
+        .theme-gold {
+            background: radial-gradient(circle, #211c11 0%, #0d0b07 100%);
+            --board-bg: #dfb15b;
+            --board-border: #997126;
+            --grid-line: #7a5818;
+            --cell-hover: rgba(255, 215, 0, 0.3);
+            --card-bg: rgba(33, 28, 17, 0.85);
+            --card-border: rgba(223, 177, 91, 0.4);
+            --text-color: #fff3d1;
+            --accent-color: #ffd700;
+        }
+
+        .theme-galaxy {
+            background: radial-gradient(circle, #080d21 0%, #02040a 100%);
+            --board-bg: #121c3b;
+            --board-border: #3d5afe;
+            --grid-line: #283593;
+            --cell-hover: rgba(61, 90, 254, 0.25);
+            --card-bg: rgba(18, 28, 59, 0.85);
+            --card-border: rgba(61, 90, 254, 0.4);
+            --text-color: #8c9eff;
+            --accent-color: #00e5ff;
+        }
+
+        /* Lưới cờ Caro 15x15 */
+        .board-container {
+            background-color: var(--board-bg);
+            border: 6px solid var(--board-border);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+            transition: all 0.3s ease;
+        }
+
+        .board-grid {
+            display: grid;
+            grid-template-columns: repeat(15, minmax(0, 1fr));
+            grid-template-rows: repeat(15, minmax(0, 1fr));
+            width: min(85vw, 540px);
+            height: min(85vw, 540px);
+            background-image: 
+                linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
+                linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
+            background-size: calc(100% / 15) calc(100% / 15);
+        }
+
+        .cell {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            position: relative;
+            transition: background-color 0.15s ease;
+        }
+
+        .cell:hover {
+            background-color: var(--cell-hover);
+        }
+
+        /* Quân cờ X và O */
+        .piece-x {
+            color: #e74c3c;
+            font-weight: 900;
+            text-shadow: 0 0 5px rgba(231, 76, 60, 0.6);
+            animation: popIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .piece-o {
+            color: #2980b9;
+            font-weight: 900;
+            text-shadow: 0 0 5px rgba(41, 128, 185, 0.6);
+            animation: popIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .last-move {
+            position: relative;
+        }
+
+        .last-move::after {
+            content: '';
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background-color: #2ecc71;
+            border-radius: 50%;
+            box-shadow: 0 0 8px #2ecc71;
+        }
+
+        .winning-cell {
+            background-color: rgba(46, 204, 113, 0.4) !important;
+            animation: pulseWin 1s infinite alternate;
+        }
+
+        @keyframes popIn {
+            0% { transform: scale(0); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        @keyframes pulseWin {
+            0% { transform: scale(0.95); opacity: 0.8; }
+            100% { transform: scale(1.05); opacity: 1; }
+        }
+
+        .glass-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            backdrop-filter: blur(10px);
+            color: var(--text-color);
+        }
+
+        .custom-scroll::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scroll::-webkit-scrollbar-track {
+            background: rgba(0,0,0,0.2);
+        }
+        .custom-scroll::-webkit-scrollbar-thumb {
+            background: var(--card-border);
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body class="theme-wood min-h-screen flex flex-col justify-between items-center p-2 sm:p-4 text-slate-100 transition-colors duration-500">
+
+    <!-- Header / Navbar -->
+    <header class="w-full max-w-4xl flex justify-between items-center p-3 sm:p-4 rounded-2xl glass-card mb-3 shadow-xl">
+        <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-full bg-amber-500/20 border border-amber-400 flex items-center justify-center text-amber-400 font-bold text-xl">
+                <i class="fa-solid fa-gamepad"></i>
+            </div>
+            <div>
+                <h1 class="text-lg sm:text-xl font-extrabold tracking-wide text-amber-400">CARO 15x15</h1>
+                <p id="user-display-name" class="text-xs text-slate-300">Chưa đăng nhập</p>
+            </div>
+        </div>
+
+        <div id="stats-bar" class="hidden flex items-center space-x-2 sm:space-x-4 text-xs sm:text-sm">
+            <div class="flex items-center space-x-1 bg-amber-500/10 px-2 sm:px-3 py-1 rounded-lg border border-amber-500/30" title="Token của bạn">
+                <i class="fa-solid fa-coins text-amber-400"></i>
+                <span id="token-balance" class="font-bold text-amber-400">0</span>
+            </div>
+            <div class="flex items-center space-x-1 bg-rose-500/10 px-2 sm:px-3 py-1 rounded-lg border border-rose-500/30" title="Chuỗi ngày đăng nhập liên tục">
+                <i class="fa-solid fa-fire text-rose-500"></i>
+                <span id="streak-count" class="font-bold text-rose-400">1</span>d
+            </div>
+            <div class="flex items-center space-x-1 bg-emerald-500/10 px-2 sm:px-3 py-1 rounded-lg border border-emerald-500/30" title="Tổng trận thắng">
+                <i class="fa-solid fa-trophy text-emerald-400"></i>
+                <span id="win-count" class="font-bold text-emerald-400">0</span>
+            </div>
+            <button id="shop-btn" class="bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold p-2 rounded-lg transition text-xs flex items-center space-x-1">
+                <i class="fa-solid fa-store"></i>
+                <span class="hidden sm:inline">Shop</span>
+            </button>
+            <button id="logout-btn" class="bg-red-500/20 hover:bg-red-500/40 text-red-300 p-2 rounded-lg transition text-xs">
+                <i class="fa-solid fa-right-from-bracket"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- MAIN APP CONTAINER -->
+    <main class="w-full max-w-4xl flex-1 flex flex-col items-center justify-center relative">
+
+        <!-- 1. MAN HINH DANG NHAP / DANG KY -->
+        <section id="auth-section" class="w-full max-w-md glass-card p-6 sm:p-8 rounded-3xl shadow-2xl my-auto">
+            <div class="text-center mb-6">
+                <div class="inline-block p-4 rounded-full bg-amber-500/10 border border-amber-400/30 mb-2">
+                    <i class="fa-solid fa-chess-board text-4xl text-amber-400"></i>
+                </div>
+                <h2 class="text-2xl font-bold text-amber-400">Đăng Nhập / Đăng Ký</h2>
+                <p class="text-xs text-slate-400 mt-1">Nhập tài khoản để tiếp tục chơi Cờ Caro</p>
+            </div>
+
+            <form id="auth-form" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold mb-1 text-slate-300">Tên người chơi / Tài khoản</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                            <i class="fa-solid fa-user"></i>
+                        </span>
+                        <input type="text" id="username-input" required class="w-full pl-10 pr-4 py-2.5 bg-slate-900/60 border border-slate-700 rounded-xl focus:outline-none focus:border-amber-400 text-sm transition" placeholder="Nhập tên tài khoản...">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold mb-1 text-slate-300">Mật khẩu</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                            <i class="fa-solid fa-lock"></i>
+                        </span>
+                        <input type="password" id="password-input" required class="w-full pl-10 pr-4 py-2.5 bg-slate-900/60 border border-slate-700 rounded-xl focus:outline-none focus:border-amber-400 text-sm transition" placeholder="Nhập mật khẩu...">
+                    </div>
+                </div>
+
+                <div id="auth-error" class="hidden text-xs text-red-400 bg-red-500/10 p-2.5 rounded-lg border border-red-500/20 text-center"></div>
+
+                <div class="grid grid-cols-2 gap-3 pt-2">
+                    <button type="submit" id="login-btn" class="w-full py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl transition shadow-lg shadow-amber-500/20 text-sm">
+                        Đăng Nhập
+                    </button>
+                    <button type="button" id="register-btn" class="w-full py-2.5 bg-slate-700 hover:bg-slate-600 font-bold rounded-xl transition text-sm">
+                        Đăng Ký Mới
+                    </button>
+                </div>
+            </form>
+        </section>
+
+        <!-- 2. MAN HINH CHON CHE DO CHOI -->
+        <section id="mode-section" class="hidden w-full max-w-2xl glass-card p-6 sm:p-8 rounded-3xl shadow-2xl my-auto space-y-6">
+            <div class="text-center">
+                <h2 class="text-2xl font-extrabold text-amber-400">Chọn Chế Độ Chơi</h2>
+                <p class="text-xs text-slate-300 mt-1">Chọn chế độ bạn muốn trải nghiệm ngay bây giờ</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <!-- Mode 1: Choi voi May -->
+                <button onclick="selectMode('pve')" class="flex flex-col items-center justify-center p-5 rounded-2xl bg-slate-800/60 border border-slate-700 hover:border-amber-400 hover:bg-amber-500/10 transition group text-center space-y-3">
+                    <div class="w-14 h-14 rounded-2xl bg-amber-500/20 flex items-center justify-center text-amber-400 text-2xl group-hover:scale-110 transition">
+                        <i class="fa-solid fa-robot"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-amber-400 text-sm sm:text-base">Chơi Với Máy</h3>
+                        <p class="text-[11px] text-slate-400 mt-1">Thách đấu AI với 3 cấp độ Dễ, Trung Bình, Khó</p>
+                    </div>
+                </button>
+
+                <!-- Mode 2: Luyen Tap Auto AI -->
+                <button onclick="selectMode('practice')" class="flex flex-col items-center justify-center p-5 rounded-2xl bg-slate-800/60 border border-slate-700 hover:border-emerald-400 hover:bg-emerald-500/10 transition group text-center space-y-3">
+                    <div class="w-14 h-14 rounded-2xl bg-emerald-500/20 flex items-center justify-center text-emerald-400 text-2xl group-hover:scale-110 transition">
+                        <i class="fa-solid fa-chalkboard-user"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-emerald-400 text-sm sm:text-base">Luyện Tập (AI vs AI)</h3>
+                        <p class="text-[11px] text-slate-400 mt-1">Cho 2 máy tự đấu liên tục để theo dõi & học tập</p>
+                    </div>
+                </button>
+
+                <!-- Mode 3: Dau Online P2P -->
+                <button onclick="selectMode('online')" class="flex flex-col items-center justify-center p-5 rounded-2xl bg-slate-800/60 border border-slate-700 hover:border-cyan-400 hover:bg-cyan-500/10 transition group text-center space-y-3">
+                    <div class="w-14 h-14 rounded-2xl bg-cyan-500/20 flex items-center justify-center text-cyan-400 text-2xl group-hover:scale-110 transition">
+                        <i class="fa-solid fa-globe"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-cyan-400 text-sm sm:text-base">Đấu Online</h3>
+                        <p class="text-[11px] text-slate-400 mt-1">Chơi 1v1 Realtime Socket P2P với bạn bè</p>
+                    </div>
+                </button>
+            </div>
+        </section>
+
+        <!-- 3. DIALOG SUB-MENU: AI DIFFICULTY SELECT -->
+        <div id="ai-difficulty-modal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div class="glass-card p-6 rounded-2xl max-w-sm w-full space-y-4 text-center">
+                <h3 class="text-lg font-bold text-amber-400"><i class="fa-solid fa-sliders"></i> Chọn Cấp Độ Máy</h3>
+                <div class="space-y-2">
+                    <button onclick="startPvEGame('easy')" class="w-full py-2.5 rounded-xl bg-emerald-500/20 border border-emerald-500/40 hover:bg-emerald-500/30 text-emerald-300 font-bold transition text-sm">
+                        😊 Cấp Độ Dễ
+                    </button>
+                    <button onclick="startPvEGame('medium')" class="w-full py-2.5 rounded-xl bg-amber-500/20 border border-amber-500/40 hover:bg-amber-500/30 text-amber-300 font-bold transition text-sm">
+                        🤔 Cấp Độ Trung Bình
+                    </button>
+                    <button onclick="startPvEGame('hard')" class="w-full py-2.5 rounded-xl bg-rose-500/20 border border-rose-500/40 hover:bg-rose-500/30 text-rose-300 font-bold transition text-sm">
+                        🔥 Cấp Độ Khó
+                    </button>
+                </div>
+                <button onclick="closeModal('ai-difficulty-modal')" class="text-xs text-slate-400 hover:underline pt-2">Hủy Bỏ</button>
+            </div>
+        </div>
+
+        <!-- 4. DIALOG SUB-MENU: ONLINE LOBBY (KHUNG 1 & KHUNG 2) -->
+        <div id="online-lobby-modal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div class="glass-card p-6 sm:p-8 rounded-3xl max-w-lg w-full space-y-6">
+                <div class="text-center">
+                    <h3 class="text-xl font-bold text-cyan-400"><i class="fa-solid fa-network-wired"></i> Phòng Đấu Online Socket</h3>
+                    <p class="text-xs text-slate-400 mt-1">Kết nối hai máy chơi thời gian thực qua WebRTC/Socket P2P</p>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <!-- KHUNG 1: NHAP ID PHONG -->
+                    <div class="p-4 rounded-2xl bg-slate-900/60 border border-slate-700 flex flex-col justify-between space-y-3">
+                        <div>
+                            <h4 class="font-bold text-amber-400 text-sm mb-1"><i class="fa-solid fa-right-to-bracket"></i> KHUNG 1</h4>
+                            <label class="block text-xs text-slate-300 mb-2">Nhập ID Phòng của bạn</label>
+                            <input type="text" id="join-room-id" class="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-xs focus:outline-none focus:border-cyan-400" placeholder="Dán ID phòng vào đây...">
+                        </div>
+                        <button onclick="joinOnlineRoom()" class="w-full py-2 bg-cyan-500 hover:bg-cyan-600 text-slate-950 font-bold rounded-xl text-xs transition">
+                            Vào Phòng Đấu
+                        </button>
+                    </div>
+
+                    <!-- KHUNG 2: TAO PHONG KEM ID CO SAO CHEP -->
+                    <div class="p-4 rounded-2xl bg-slate-900/60 border border-slate-700 flex flex-col justify-between space-y-3">
+                        <div>
+                            <h4 class="font-bold text-emerald-400 text-sm mb-1"><i class="fa-solid fa-plus-circle"></i> KHUNG 2</h4>
+                            <label class="block text-xs text-slate-300 mb-1">Tạo Phòng Mới</label>
+                            <p class="text-[11px] text-slate-400 mb-2">Bấm tạo phòng và gửi ID này cho đối thủ của bạn</p>
+                            <div class="flex items-center space-x-1">
+                                <input type="text" id="my-created-room-id" readonly class="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded-lg text-[11px] text-emerald-400 font-mono" placeholder="Đang tạo ID...">
+                                <button onclick="copyRoomID()" title="Sao chép ID" class="p-1.5 bg-emerald-500/20 hover:bg-emerald-500/40 text-emerald-300 border border-emerald-500/30 rounded-lg text-xs">
+                                    <i class="fa-solid fa-copy"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <button onclick="createOnlineRoom()" class="w-full py-2 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold rounded-xl text-xs transition">
+                            Khởi Tạo Phòng
+                        </button>
+                    </div>
+                </div>
+
+                <div id="online-status-msg" class="text-center text-xs text-amber-300 min-h-[1rem]"></div>
+
+                <div class="text-center">
+                    <button onclick="closeModal('online-lobby-modal')" class="text-xs text-slate-400 hover:underline">Thoát Ra Menu</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 5. SHOP GIAO DIEN -->
+        <div id="shop-modal" class="hidden fixed inset-0 bg-black/75 backdrop-blur-md z-50 flex items-center justify-center p-4">
+            <div class="glass-card p-6 rounded-3xl max-w-2xl w-full max-h-[90vh] flex flex-col space-y-4">
+                <div class="flex justify-between items-center border-b border-slate-700 pb-3">
+                    <div class="flex items-center space-x-2">
+                        <i class="fa-solid fa-store text-amber-400 text-xl"></i>
+                        <h3 class="text-lg font-bold text-amber-400">Cửa Hàng Giao Diện Trò Chơi</h3>
+                    </div>
+                    <button onclick="closeModal('shop-modal')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+                </div>
+
+                <div class="flex justify-between items-center bg-slate-900/60 p-3 rounded-xl">
+                    <span class="text-xs text-slate-300">Xu hiện có:</span>
+                    <span class="text-sm font-bold text-amber-400 flex items-center space-x-1">
+                        <i class="fa-solid fa-coins"></i>
+                        <span id="shop-user-tokens">0</span> Token
+                    </span>
+                </div>
+
+                <!-- Danh sach Themes -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 overflow-y-auto custom-scroll pr-1 flex-1" id="theme-list">
+                    <!-- Themes JS Render -->
+                </div>
+            </div>
+        </div>
+
+        <!-- 6. KHU VUC BAN CO & CONTROL -->
+        <section id="game-section" class="hidden flex-col items-center justify-center space-y-3 w-full">
+            <!-- BAR THONG TIN TRAN DAU -->
+            <div class="w-full max-w-lg glass-card px-4 py-2 rounded-xl flex justify-between items-center text-xs sm:text-sm">
+                <div class="flex items-center space-x-2">
+                    <span id="player-x-badge" class="font-bold text-rose-400 flex items-center space-x-1">
+                        <i class="fa-solid fa-xmark text-base"></i>
+                        <span id="player-x-name">Bạn (X)</span>
+                    </span>
+                </div>
+
+                <div class="flex items-center space-x-2">
+                    <span id="game-turn-status" class="px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-semibold animate-pulse">
+                        Lượt đi: X
+                    </span>
+                </div>
+
+                <div class="flex items-center space-x-2">
+                    <span id="player-o-badge" class="font-bold text-cyan-400 flex items-center space-x-1">
+                        <i class="fa-solid fa-o text-sm"></i>
+                        <span id="player-o-name">Đối Thủ (O)</span>
+                    </span>
+                </div>
+            </div>
+
+            <!-- NÚT ĐIỀU KHIỂN CHẾ ĐỘ PRACTICE (LUYỆN TẬP AUTO AI) -->
+            <div id="practice-controls" class="hidden flex items-center space-x-3 bg-slate-900/80 px-4 py-2 rounded-xl border border-slate-700 text-xs">
+                <span class="text-emerald-400 font-bold"><i class="fa-solid fa-robot"></i> AI Auto Play</span>
+                <button onclick="togglePracticePause()" id="practice-pause-btn" class="px-2.5 py-1 bg-amber-500 text-slate-950 font-bold rounded hover:bg-amber-400">Tạm Dừng</button>
+                <div class="flex items-center space-x-1">
+                    <span>Tốc độ:</span>
+                    <button onclick="setPracticeSpeed(1000)" class="px-2 py-0.5 bg-slate-700 rounded hover:bg-slate-600">1x</button>
+                    <button onclick="setPracticeSpeed(400)" class="px-2 py-0.5 bg-slate-700 rounded hover:bg-slate-600">2x</button>
+                    <button onclick="setPracticeSpeed(100)" class="px-2 py-0.5 bg-slate-700 rounded hover:bg-slate-600">4x</button>
+                </div>
+            </div>
+
+            <!-- BOARD CONTAINER -->
+            <div class="board-container rounded-xl p-1 sm:p-2 shadow-2xl">
+                <div id="board" class="board-grid"></div>
+            </div>
+
+            <!-- ACTION BUTTONS -->
+            <div class="flex items-center space-x-3 pt-1">
+                <button onclick="leaveGame()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-600 rounded-xl text-xs font-semibold transition">
+                    <i class="fa-solid fa-arrow-left mr-1"></i> Thoát Trận
+                </button>
+                <button onclick="resetCurrentGame()" class="px-4 py-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded-xl text-xs font-semibold transition">
+                    <i class="fa-solid fa-rotate-right mr-1"></i> Chơi Lại
+                </button>
+            </div>
+        </section>
+
+        <!-- 7. POPUP KET QUA THANG / HOA -->
+        <div id="result-modal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+            <div class="glass-card p-6 sm:p-8 rounded-3xl max-w-sm w-full text-center space-y-5 animate-bounce-short">
+                <div id="result-icon-box" class="w-20 h-20 rounded-full mx-auto flex items-center justify-center text-4xl bg-amber-500/20 border-2 border-amber-400 text-amber-400">
+                    <i class="fa-solid fa-trophy"></i>
+                </div>
+
+                <div>
+                    <h3 id="result-title" class="text-2xl font-black text-amber-400">CHIẾN THẮNG!</h3>
+                    <p id="result-subtitle" class="text-xs text-slate-300 mt-1">Bạn đã xếp đủ 5 ô liên tiếp</p>
+                </div>
+
+                <div id="reward-box" class="hidden p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-300">
+                    +<span id="reward-tokens" class="font-bold text-amber-400">50</span> Token Thưởng! 🎉
+                </div>
+
+                <div class="flex space-x-2 pt-2">
+                    <button onclick="closeModal('result-modal'); resetCurrentGame();" class="flex-1 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl text-xs transition">
+                        Chơi Trận Mới
+                    </button>
+                    <button onclick="closeModal('result-modal'); leaveGame();" class="flex-1 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-200 font-bold rounded-xl text-xs transition">
+                        Về Menu
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="w-full max-w-4xl text-center py-3 text-[11px] text-slate-500 border-t border-slate-800/60 mt-4">
+        Game Cờ Caro 15x15 Web Application &copy; 2026 - Tối ưu chạy trên GitHub Pages
+    </footer>
+
+    <!-- LOGIC tro choi CARO 15x15 JS -->
+    <script>
+        // ==========================================
+        // CONSTANTS & GAME STATE
+        // ==========================================
+        const BOARD_SIZE = 15;
+        let board = Array(BOARD_SIZE).fill(null).map(() => Array(BOARD_SIZE).fill(null));
+        let currentUser = null;
+        let currentMode = null; // 'pve', 'practice', 'online'
+        let aiDifficulty = 'medium'; // 'easy', 'medium', 'hard'
+        let currentPlayer = 'X'; // 'X' hoac 'O'
+        let mySymbol = 'X';
+        let isGameActive = false;
+        let lastMove = null;
+        let winningCells = [];
+
+        // State cho Mode Practice
+        let practiceInterval = null;
+        let isPracticePaused = false;
+        let practiceSpeed = 400;
+
+        // State cho Mode Online (PeerJS WebRTC Socket)
+        let peer = null;
+        let peerConn = null;
+        let isMyTurn = true;
+
+        // THEMES CONFIG
+        const THEMES = [
+            { id: 'theme-wood', name: 'Gỗ Classic ZingPlay', price: 0, icon: 'fa-tree', class: 'theme-wood' },
+            { id: 'theme-cyberpunk', name: 'Cyberpunk Neon', price: 100, icon: 'fa-bolt', class: 'theme-cyberpunk' },
+            { id: 'theme-sakura', name: 'Hoa Anh Đào', price: 150, icon: 'fa-fan', class: 'theme-sakura' },
+            { id: 'theme-dark', name: 'Dark Minimalist', price: 200, icon: 'fa-moon', class: 'theme-dark' },
+            { id: 'theme-gold', name: 'Hoàng Gia Gold', price: 300, icon: 'fa-crown', class: 'theme-gold' },
+            { id: 'theme-galaxy', name: 'Vũ Trụ Galaxy', price: 500, icon: 'fa-meteor', class: 'theme-galaxy' }
+        ];
+
+        // ==========================================
+        // INITIALIZATION & AUTHENTICATION
+        // ==========================================
+        window.addEventListener('DOMContentLoaded', () => {
+            initBoardUI();
+            checkAutoLogin();
+            renderThemeShop();
+        });
+
+        function checkAutoLogin() {
+            const savedUser = localStorage.getItem('caro_current_user');
+            if (savedUser) {
+                const users = JSON.parse(localStorage.getItem('caro_users') || '{}');
+                if (users[savedUser]) {
+                    currentUser = users[savedUser];
+                    updateStreak();
+                    showMainApp();
+                    return;
+                }
+            }
+            showAuthSection();
+        }
+
+        // Đăng nhập / Đăng ký submit handler
+        document.getElementById('auth-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const username = document.getElementById('username-input').value.trim();
+            const password = document.getElementById('password-input').value.trim();
+            const errorEl = document.getElementById('auth-error');
+
+            if (!username || !password) return;
+
+            let users = JSON.parse(localStorage.getItem('caro_users') || '{}');
+
+            if (users[username]) {
+                // Kiem tra mat khau
+                if (users[username].password === password) {
+                    currentUser = users[username];
+                    localStorage.setItem('caro_current_user', username);
+                    updateStreak();
+                    showMainApp();
+                } else {
+                    errorEl.innerText = "Mật khẩu không chính xác! Vui lòng thử lại.";
+                    errorEl.classList.remove('hidden');
+                }
+            } else {
+                errorEl.innerText = "Tài khoản không tồn tại! Nhấn 'Đăng Ký Mới' để tạo.";
+                errorEl.classList.remove('hidden');
+            }
+        });
+
+        document.getElementById('register-btn').addEventListener('click', () => {
+            const username = document.getElementById('username-input').value.trim();
+            const password = document.getElementById('password-input').value.trim();
+            const errorEl = document.getElementById('auth-error');
+
+            if (!username || !password) {
+                errorEl.innerText = "Vui lòng nhập đầy đủ tên người chơi và mật khẩu.";
+                errorEl.classList.remove('hidden');
+                return;
+            }
+
+            let users = JSON.parse(localStorage.getItem('caro_users') || '{}');
+
+            if (users[username]) {
+                errorEl.innerText = "Tài khoản này đã tồn tại! Vui lòng đăng nhập.";
+                errorEl.classList.remove('hidden');
+            } else {
+                const newUser = {
+                    username: username,
+                    password: password,
+                    tokens: 100, // Thuong 100 token khi tao tai khoan
+                    wins: 0,
+                    streak: 1,
+                    lastLoginDate: new Date().toDateString(),
+                    ownedThemes: ['theme-wood'],
+                    currentTheme: 'theme-wood'
+                };
+                users[username] = newUser;
+                localStorage.setItem('caro_users', JSON.stringify(users));
+                localStorage.setItem('caro_current_user', username);
+                currentUser = newUser;
+                showMainApp();
+            }
+        });
+
+        document.getElementById('logout-btn').addEventListener('click', () => {
+            localStorage.removeItem('caro_current_user');
+            currentUser = null;
+            location.reload();
+        });
+
+        function saveUserData() {
+            if (!currentUser) return;
+            let users = JSON.parse(localStorage.getItem('caro_users') || '{}');
+            users[currentUser.username] = currentUser;
+            localStorage.setItem('caro_users', JSON.stringify(users));
+            updateHeaderStats();
+        }
+
+        function updateStreak() {
+            if (!currentUser) return;
+            const today = new Date().toDateString();
+            if (!currentUser.lastLoginDate) {
+                currentUser.lastLoginDate = today;
+                currentUser.streak = 1;
+            } else if (currentUser.lastLoginDate !== today) {
+                const last = new Date(currentUser.lastLoginDate);
+                const now = new Date(today);
+                const diffTime = Math.abs(now - last);
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+                if (diffDays === 1) {
+                    currentUser.streak += 1;
+                } else if (diffDays > 1) {
+                    currentUser.streak = 1; // Mất chuỗi nếu bỏ quá 1 ngày
+                }
+                currentUser.lastLoginDate = today;
+            }
+            saveUserData();
+        }
+
+        function updateHeaderStats() {
+            if (!currentUser) return;
+            document.getElementById('user-display-name').innerText = currentUser.username;
+            document.getElementById('token-balance').innerText = currentUser.tokens || 0;
+            document.getElementById('streak-count').innerText = currentUser.streak || 1;
+            document.getElementById('win-count').innerText = currentUser.wins || 0;
+            document.getElementById('shop-user-tokens').innerText = currentUser.tokens || 0;
+
+            // Apply saved theme
+            applyTheme(currentUser.currentTheme || 'theme-wood');
+        }
+
+        function showMainApp() {
+            document.getElementById('auth-section').classList.add('hidden');
+            document.getElementById('stats-bar').classList.remove('hidden');
+            document.getElementById('stats-bar').classList.add('flex');
+            document.getElementById('mode-section').classList.remove('hidden');
+            updateHeaderStats();
+        }
+
+        function showAuthSection() {
+            document.getElementById('auth-section').classList.remove('hidden');
+            document.getElementById('stats-bar').classList.add('hidden');
+            document.getElementById('mode-section').classList.add('hidden');
+            document.getElementById('game-section').classList.add('hidden');
+        }
+
+        // ==========================================
+        // BOARD & UI RENDERING
+        // ==========================================
+        function initBoardUI() {
+            const boardEl = document.getElementById('board');
+            boardEl.innerHTML = '';
+            for (let r = 0; r < BOARD_SIZE; r++) {
+                for (let c = 0; c < BOARD_SIZE; c++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell text-xs sm:text-base font-bold';
+                    cell.dataset.row = r;
+                    cell.dataset.col = c;
+                    cell.addEventListener('click', () => handleCellClick(r, c));
+                    boardEl.appendChild(cell);
+                }
+            }
+        }
+
+        function renderBoard() {
+            for (let r = 0; r < BOARD_SIZE; r++) {
+                for (let c = 0; c < BOARD_SIZE; c++) {
+                    const cellEl = document.querySelector(`.cell[data-row="${r}"][data-col="${c}"]`);
+                    const val = board[r][c];
+                    cellEl.className = 'cell text-xs sm:text-base font-bold';
+                    cellEl.innerHTML = '';
+
+                    if (val === 'X') {
+                        cellEl.innerHTML = `<span class="piece-x">X</span>`;
+                    } else if (val === 'O') {
+                        cellEl.innerHTML = `<span class="piece-o">O</span>`;
+                    }
+
+                    if (lastMove && lastMove.r === r && lastMove.c === c) {
+                        cellEl.classList.add('last-move');
+                    }
+
+                    if (winningCells.some(cell => cell.r === r && cell.c === c)) {
+                        cellEl.classList.add('winning-cell');
+                    }
+                }
+            }
+
+            // Update turn display
+            const turnStatusEl = document.getElementById('game-turn-status');
+            if (currentMode === 'online') {
+                turnStatusEl.innerText = isMyTurn ? `Lượt của bạn (${mySymbol})` : `Lượt đối thủ...`;
+            } else {
+                turnStatusEl.innerText = `Lượt đi: ${currentPlayer}`;
+            }
+        }
+
+        function resetBoardData() {
+            board = Array(BOARD_SIZE).fill(null).map(() => Array(BOARD_SIZE).fill(null));
+            lastMove = null;
+            winningCells = [];
+            currentPlayer = 'X';
+            isGameActive = true;
+            renderBoard();
+        }
+
+        // ==========================================
+        // GAME MODES & LOGIC
+        // ==========================================
+        function selectMode(mode) {
+            currentMode = mode;
+            if (mode === 'pve') {
+                openModal('ai-difficulty-modal');
+            } else if (mode === 'practice') {
+                startPracticeGame();
+            } else if (mode === 'online') {
+                openModal('online-lobby-modal');
+                initPeerJS();
+            }
+        }
+
+        function startPvEGame(difficulty) {
+            aiDifficulty = difficulty;
+            closeModal('ai-difficulty-modal');
+            document.getElementById('mode-section').classList.add('hidden');
+            document.getElementById('game-section').classList.remove('hidden');
+            document.getElementById('game-section').classList.add('flex');
+            document.getElementById('practice-controls').classList.add('hidden');
+
+            document.getElementById('player-x-name').innerText = `${currentUser.username} (X)`;
+            document.getElementById('player-o-name').innerText = `Máy (${difficulty.toUpperCase()}) (O)`;
+
+            mySymbol = 'X';
+            resetBoardData();
+        }
+
+        function startPracticeGame() {
+            document.getElementById('mode-section').classList.add('hidden');
+            document.getElementById('game-section').classList.remove('hidden');
+            document.getElementById('game-section').classList.add('flex');
+            document.getElementById('practice-controls').classList.remove('hidden');
+            document.getElementById('practice-controls').classList.add('flex');
+
+            document.getElementById('player-x-name').innerText = `Máy Bot A (X)`;
+            document.getElementById('player-o-name').innerText = `Máy Bot B (O)`;
+
+            resetBoardData();
+            runPracticeLoop();
+        }
+
+        function runPracticeLoop() {
+            clearInterval(practiceInterval);
+            isPracticePaused = false;
+            document.getElementById('practice-pause-btn').innerText = "Tạm Dừng";
+
+            practiceInterval = setInterval(() => {
+                if (!isGameActive || isPracticePaused) return;
+
+                const bestMove = getAIBestMove(currentPlayer, 'medium');
+                if (bestMove) {
+                    makeMove(bestMove.r, bestMove.c, currentPlayer);
+                }
+            }, practiceSpeed);
+        }
+
+        function togglePracticePause() {
+            isPracticePaused = !isPracticePaused;
+            document.getElementById('practice-pause-btn').innerText = isPracticePaused ? "Tiếp Tục" : "Tạm Dừng";
+        }
+
+        function setPracticeSpeed(speed) {
+            practiceSpeed = speed;
+            if (currentMode === 'practice') runPracticeLoop();
+        }
+
+        // ==========================================
+        // ONLINE MULTIPLAYER (PEERJS SOCKET)
+        // ==========================================
+        function initPeerJS() {
+            if (peer) return;
+            const statusEl = document.getElementById('online-status-msg');
+            statusEl.innerText = "Đang kết nối Server Socket...";
+
+            // PeerJS ID ngẫu nhiên
+            const randomID = 'caro-' + Math.floor(100000 + Math.random() * 900000);
+            peer = new Peer(randomID);
+
+            peer.on('open', (id) => {
+                document.getElementById('my-created-room-id').value = id;
+                statusEl.innerText = "Sẵn sàng tạo hoặc tham gia phòng!";
+            });
+
+            peer.on('connection', (conn) => {
+                peerConn = conn;
+                setupPeerEvents();
+                // Người tạo phòng đi trước (X)
+                mySymbol = 'X';
+                isMyTurn = true;
+                startOnlineMatch("Đối thủ kết nối!");
+            });
+
+            peer.on('error', (err) => {
+                statusEl.innerText = "Lỗi kết nối Socket: " + err.type;
+            });
+        }
+
+        function createOnlineRoom() {
+            const roomID = document.getElementById('my-created-room-id').value;
+            if (!roomID) return;
+            document.getElementById('online-status-msg').innerText = "Đang chờ đối thủ nhập ID phòng...";
+        }
+
+        function joinOnlineRoom() {
+            const targetID = document.getElementById('join-room-id').value.trim();
+            if (!targetID) {
+                alert("Vui lòng nhập ID phòng!");
+                return;
+            }
+
+            document.getElementById('online-status-msg').innerText = "Đang kết nối tới phòng " + targetID + "...";
+            peerConn = peer.connect(targetID);
+
+            peerConn.on('open', () => {
+                setupPeerEvents();
+                // Người tham gia đi sau (O)
+                mySymbol = 'O';
+                isMyTurn = false;
+                startOnlineMatch("Đã kết nối thành công!");
+            });
+        }
+
+        function setupPeerEvents() {
+            peerConn.on('data', (data) => {
+                if (data.type === 'MOVE') {
+                    makeMove(data.r, data.c, data.symbol);
+                    isMyTurn = true;
+                    renderBoard();
+                } else if (data.type === 'RESET') {
+                    resetBoardData();
+                }
+            });
+
+            peerConn.on('close', () => {
+                alert("Đối thủ đã thoát phòng!");
+                leaveGame();
+            });
+        }
+
+        function startOnlineMatch(msg) {
+            closeModal('online-lobby-modal');
+            document.getElementById('mode-section').classList.add('hidden');
+            document.getElementById('game-section').classList.remove('hidden');
+            document.getElementById('game-section').classList.add('flex');
+            document.getElementById('practice-controls').classList.add('hidden');
+
+            document.getElementById('player-x-name').innerText = mySymbol === 'X' ? `${currentUser.username} (X)` : `Đối thủ (X)`;
+            document.getElementById('player-o-name').innerText = mySymbol === 'O' ? `${currentUser.username} (O)` : `Đối thủ (O)`;
+
+            resetBoardData();
+        }
+
+        function copyRoomID() {
+            const input = document.getElementById('my-created-room-id');
+            input.select();
+            navigator.clipboard.writeText(input.value);
+            alert("Đã sao chép ID phòng: " + input.value);
+        }
+
+        // ==========================================
+        // CELL CLICK & GAME LOGIC
+        // ==========================================
+        function handleCellClick(r, c) {
+            if (!isGameActive || board[r][c] !== null) return;
+
+            if (currentMode === 'pve') {
+                if (currentPlayer !== 'X') return; // Lượt của máy
+                makeMove(r, c, 'X');
+
+                if (isGameActive) {
+                    // Máy đánh trả
+                    setTimeout(() => {
+                        const aiMove = getAIBestMove('O', aiDifficulty);
+                        if (aiMove) makeMove(aiMove.r, aiMove.c, 'O');
+                    }, 300);
+                }
+            } else if (currentMode === 'online') {
+                if (!isMyTurn || currentPlayer !== mySymbol) return;
+
+                makeMove(r, c, mySymbol);
+                isMyTurn = false;
+                renderBoard();
+
+                // Gửi nước đi qua Socket P2P
+                if (peerConn && peerConn.open) {
+                    peerConn.send({ type: 'MOVE', r: r, c: c, symbol: mySymbol });
+                }
+            }
+        }
+
+        function makeMove(r, c, symbol) {
+            if (!isGameActive || board[r][c] !== null) return;
+
+            board[r][c] = symbol;
+            lastMove = { r, c };
+
+            // Kiểm tra thắng thua 5 ô liên tiếp
+            const winInfo = checkWin(r, c, symbol);
+            if (winInfo) {
+                isGameActive = false;
+                winningCells = winInfo.line;
+                renderBoard();
+                handleGameEnd(symbol);
+                return;
+            }
+
+            // Kiểm tra Hòa (Kín hết 225 ô)
+            if (checkDraw()) {
+                isGameActive = false;
+                renderBoard();
+                handleGameEnd('DRAW');
+                return;
+            }
+
+            currentPlayer = symbol === 'X' ? 'O' : 'X';
+            renderBoard();
+        }
+
+        // Kiem tra 5 o liên tiếp hàng ngang, dọc, chéo
+        function checkWin(r, c, symbol) {
+            const directions = [
+                [[0, 1], [0, -1]],  // Hàng Ngang
+                [[1, 0], [-1, 0]],  // Hàng Dọc
+                [[1, 1], [-1, -1]], // Chéo chính
+                [[1, -1], [-1, 1]]  // Chéo phụ
+            ];
+
+            for (let d = 0; d < directions.length; d++) {
+                let line = [{ r, c }];
+                for (let i = 0; i < 2; i++) {
+                    const [dr, dc] = directions[d][i];
+                    let nr = r + dr;
+                    let nc = c + dc;
+                    while (nr >= 0 && nr < BOARD_SIZE && nc >= 0 && nc < BOARD_SIZE && board[nr][nc] === symbol) {
+                        line.push({ r: nr, c: nc });
+                        nr += dr;
+                        nc += dc;
+                    }
+                }
+
+                if (line.length >= 5) {
+                    return { winner: symbol, line: line };
+                }
+            }
+            return null;
+        }
+
+        function checkDraw() {
+            return board.every(row => row.every(cell => cell !== null));
+        }
+
+        function handleGameEnd(winner) {
+            clearInterval(practiceInterval);
+
+            const resultModal = document.getElementById('result-modal');
+            const resultTitle = document.getElementById('result-title');
+            const resultSubtitle = document.getElementById('result-subtitle');
+            const rewardBox = document.getElementById('reward-box');
+            const rewardTokens = document.getElementById('reward-tokens');
+
+            if (winner === 'DRAW') {
+                resultTitle.innerText = "HÒA CỜ!";
+                resultSubtitle.innerText = "Bàn cờ đã kín hết 15x15 ô mà không ai đạt 5 ô liên tiếp.";
+                rewardBox.classList.add('hidden');
+            } else {
+                let isWinner = false;
+                if (currentMode === 'pve' && winner === 'X') isWinner = true;
+                if (currentMode === 'online' && winner === mySymbol) isWinner = true;
+
+                if (isWinner) {
+                    resultTitle.innerText = "BẠN ĐÃ CHIẾN THẮNG! 🎉";
+                    resultSubtitle.innerText = "Chúc mừng! Bạn đã nối thành công 5 ô liên tiếp.";
+
+                    // Thưởng Token & Đếm Win
+                    const reward = 50;
+                    currentUser.tokens = (currentUser.tokens || 0) + reward;
+                    currentUser.wins = (currentUser.wins || 0) + 1;
+                    saveUserData();
+
+                    rewardTokens.innerText = reward;
+                    rewardBox.classList.remove('hidden');
+                } else if (currentMode === 'practice') {
+                    resultTitle.innerText = `MÁY ${winner} THẮNG!`;
+                    resultSubtitle.innerText = "Chế độ luyện tập AI vs AI kết thúc.";
+                    rewardBox.classList.add('hidden');
+                } else {
+                    resultTitle.innerText = "THẤT BẠI!";
+                    resultSubtitle.innerText = "Đối thủ đã kết nối 5 ô liên tiếp trước bạn.";
+                    rewardBox.classList.add('hidden');
+                }
+            }
+
+            openModal('result-modal');
+        }
+
+        function resetCurrentGame() {
+            resetBoardData();
+            if (currentMode === 'practice') {
+                runPracticeLoop();
+            } else if (currentMode === 'online' && peerConn && peerConn.open) {
+                peerConn.send({ type: 'RESET' });
+            }
+        }
+
+        function leaveGame() {
+            clearInterval(practiceInterval);
+            document.getElementById('game-section').classList.add('hidden');
+            document.getElementById('mode-section').classList.remove('hidden');
+            if (peerConn) {
+                peerConn.close();
+                peerConn = null;
+            }
+        }
+
+        // ==========================================
+        // AI ENGINE (EASY, MEDIUM, HARD)
+        // ==========================================
+        function getAIBestMove(aiSymbol, diff) {
+            const emptyCells = [];
+            for (let r = 0; r < BOARD_SIZE; r++) {
+                for (let c = 0; c < BOARD_SIZE; c++) {
+                    if (board[r][c] === null) emptyCells.push({ r, c });
+                }
+            }
+
+            if (emptyCells.length === 0) return null;
+
+            // EASY: Đánh ngẫu nhiên
+            if (diff === 'easy') {
+                return emptyCells[Math.floor(Math.random() * emptyCells.length)];
+            }
+
+            const humanSymbol = aiSymbol === 'X' ? 'O' : 'X';
+
+            // Duyện tìm nước đi ăn thắng ngay hoặc chặn 5
+            for (let cell of emptyCells) {
+                board[cell.r][cell.c] = aiSymbol;
+                if (checkWin(cell.r, cell.c, aiSymbol)) {
+                    board[cell.r][cell.c] = null;
+                    return cell; // Thắng ngay
+                }
+                board[cell.r][cell.c] = null;
+            }
+
+            for (let cell of emptyCells) {
+                board[cell.r][cell.c] = humanSymbol;
+                if (checkWin(cell.r, cell.c, humanSymbol)) {
+                    board[cell.r][cell.c] = null;
+                    return cell; // Chặn đối thủ thắng
+                }
+                board[cell.r][cell.c] = null;
+            }
+
+            // MEDIUM & HARD: Đánh giá Heuristic trọng số
+            let bestScore = -Infinity;
+            let bestMove = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+
+            for (let cell of emptyCells) {
+                // Chỉ đánh gần các nước đi đã có để tối ưu tốc độ
+                if (diff === 'hard' && !hasNeighbor(cell.r, cell.c)) continue;
+
+                const attackScore = evaluateCell(cell.r, cell.c, aiSymbol);
+                const defenseScore = evaluateCell(cell.r, cell.c, humanSymbol);
+                const totalScore = attackScore + defenseScore * 1.2; // Ưu tiên chặn hơn ở mode Hard
+
+                if (totalScore > bestScore) {
+                    bestScore = totalScore;
+                    bestMove = cell;
+                }
+            }
+
+            return bestMove;
+        }
+
+        function hasNeighbor(r, c) {
+            for (let dr = -2; dr <= 2; dr++) {
+                for (let dc = -2; dc <= 2; dc++) {
+                    const nr = r + dr, nc = c + dc;
+                    if (nr >= 0 && nr < BOARD_SIZE && nc >= 0 && nc < BOARD_SIZE) {
+                        if (board[nr][nc] !== null) return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        function evaluateCell(r, c, symbol) {
+            let total = 0;
+            const directions = [[[0,1],[0,-1]], [[1,0],[-1,0]], [[1,1],[-1,-1]], [[1,-1],[-1,1]]];
+
+            for (let [d1, d2] of directions) {
+                let count = 1;
+                count += countDir(r, c, d1[0], d1[1], symbol);
+                count += countDir(r, c, d2[0], d2[1], symbol);
+
+                if (count >= 5) total += 10000;
+                else if (count === 4) total += 1000;
+                else if (count === 3) total += 100;
+                else if (count === 2) total += 10;
+            }
+            return total;
+        }
+
+        function countDir(r, c, dr, dc, symbol) {
+            let cnt = 0;
+            let nr = r + dr, nc = c + dc;
+            while (nr >= 0 && nr < BOARD_SIZE && nc >= 0 && nc < BOARD_SIZE && board[nr][nc] === symbol) {
+                cnt++;
+                nr += dr;
+                nc += dc;
+            }
+            return cnt;
+        }
+
+        // ==========================================
+        // SHOP & THEME SYSTEM
+        // ==========================================
+        document.getElementById('shop-btn').addEventListener('click', () => {
+            renderThemeShop();
+            openModal('shop-modal');
+        });
+
+        function renderThemeShop() {
+            const listEl = document.getElementById('theme-list');
+            listEl.innerHTML = '';
+
+            const owned = currentUser ? (currentUser.ownedThemes || ['theme-wood']) : ['theme-wood'];
+            const activeTheme = currentUser ? (currentUser.currentTheme || 'theme-wood') : 'theme-wood';
+
+            THEMES.forEach(t => {
+                const isOwned = owned.includes(t.id);
+                const isActive = activeTheme === t.id;
+
+                const card = document.createElement('div');
+                card.className = `p-4 rounded-2xl border flex flex-col justify-between space-y-3 ${isActive ? 'border-amber-400 bg-amber-500/10' : 'border-slate-700 bg-slate-900/40'}`;
+
+                card.innerHTML = `
+                    <div class="flex items-center space-x-3">
+                        <div class="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center text-amber-400 text-lg">
+                            <i class="fa-solid ${t.icon}"></i>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-xs sm:text-sm text-slate-200">${t.name}</h4>
+                            <p class="text-[10px] text-slate-400">${isOwned ? 'Đã sở hữu' : `Giá: ${t.price} Token`}</p>
+                        </div>
+                    </div>
+                    <div>
+                        ${isActive ? `
+                            <button class="w-full py-1.5 bg-emerald-500/20 text-emerald-400 font-bold rounded-lg text-xs cursor-default">
+                                <i class="fa-solid fa-check mr-1"></i> Đang Sử Dụng
+                            </button>
+                        ` : isOwned ? `
+                            <button onclick="useTheme('${t.id}')" class="w-full py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-lg text-xs transition">
+                                Áp Dụng
+                            </button>
+                        ` : `
+                            <button onclick="buyTheme('${t.id}',${t.price})" class="w-full py-1.5 bg-cyan-500 hover:bg-cyan-600 text-slate-950 font-bold rounded-lg text-xs transition">
+                                Mua Ngay
+                            </button>
+                        `}
+                    </div>
+                `;
+                listEl.appendChild(card);
+            });
+        }
+
+        function buyTheme(themeId, price) {
+            if (!currentUser) return;
+            if ((currentUser.tokens || 0) < price) {
+                alert("Bạn không đủ Token! Hãy đánh thắng nhiều trận hơn để nhận thưởng.");
+                return;
+            }
+
+            currentUser.tokens -= price;
+            if (!currentUser.ownedThemes) currentUser.ownedThemes = ['theme-wood'];
+            currentUser.ownedThemes.push(themeId);
+            currentUser.currentTheme = themeId;
+
+            saveUserData();
+            renderThemeShop();
+            applyTheme(themeId);
+            alert("Mua giao diện thành công!");
+        }
+
+        function useTheme(themeId) {
+            if (!currentUser) return;
+            currentUser.currentTheme = themeId;
+            saveUserData();
+            renderThemeShop();
+            applyTheme(themeId);
+        }
+
+        function applyTheme(themeId) {
+            document.body.className = `${themeId} min-h-screen flex flex-col justify-between items-center p-2 sm:p-4 text-slate-100 transition-colors duration-500`;
+        }
+
+        // ==========================================
+        // UTILS & MODAL HELPERS
+        // ==========================================
+        function openModal(id) {
+            document.getElementById(id).classList.remove('hidden');
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.add('hidden');
+        }
+    </script>
+</body>
+</html>
